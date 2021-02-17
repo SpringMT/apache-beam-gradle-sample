@@ -1,0 +1,113 @@
+plugins {
+  id 'java'
+  id 'application'
+
+  id "com.github.spotbugs" version "4.0.2"
+  id "pmd"
+  id "com.diffplug.gradle.spotless" version "3.27.2"
+}
+
+version '1.0.0'
+
+compileJava.options.encoding = "UTF-8"
+compileJava {
+  sourceCompatibility = JavaVersion.VERSION_1_8
+  targetCompatibility = JavaVersion.VERSION_1_8
+}
+
+ext {
+  beamVersion = '2.27.0'
+}
+
+apply plugin: 'java'
+apply plugin: 'com.github.spotbugs'
+apply plugin: 'pmd'
+apply plugin: 'com.diffplug.gradle.spotless'
+
+allprojects {
+  repositories {
+    mavenCentral()
+  }
+
+  dependencyLocking {
+    lockAllConfigurations()
+  }
+}
+
+dependencies {
+  implementation 'org.projectlombok:lombok:1.18.16'
+  implementation 'com.google.guava:guava:28.2-jre'
+
+  // SpotBugs
+  compileOnly "com.github.spotbugs:spotbugs-annotations:3.1.12"
+  testCompileOnly "com.github.spotbugs:spotbugs-annotations:3.1.12"
+
+  // Use JUnit Jupiter API for testing.
+  testImplementation 'org.junit.jupiter:junit-jupiter-api:5.5.1'
+
+  // Use JUnit Jupiter Engine for testing.
+  testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.5.1'
+
+  // lombok
+  compileOnly 'org.projectlombok:lombok:1.18.12'
+  annotationProcessor 'org.projectlombok:lombok:1.18.12'
+  testCompileOnly 'org.projectlombok:lombok:1.18.12'
+  testAnnotationProcessor 'org.projectlombok:lombok:1.18.12'
+
+  implementation "org.apache.beam:beam-runners-google-cloud-dataflow-java:${beamVersion}"
+  implementation "org.apache.beam:beam-runners-direct-java:${beamVersion}"
+  implementation "com.google.cloud:google-cloud-firestore:1.33.0"
+  // slf4jのwarn suppression
+  implementation "org.slf4j:slf4j-jdk14:1.7.30"
+  // hamcrestいれないとcontainsInAnyOrderがこける
+  testImplementation 'org.hamcrest:hamcrest:2.1'
+}
+
+test {
+  useJUnitPlatform()
+}
+
+spotbugs {
+}
+
+pmd {
+  ignoreFailures = true
+  ruleSetFiles = files("$rootDir/config/pmd-settings.xml")
+  ruleSets = []
+}
+
+spotless {
+  java {
+    googleJavaFormat()
+  }
+}
+
+mainClassName = "sample.pipeline.UserDataPipeline"
+
+run {
+  def options = findProperty('args') ? project.args.tokenize() : []
+  options.add("--env=${findProperty('env')}")
+  options.add("--otherProject=${findProperty('otherProject')}")
+  options.add("--project=${findProperty('gcp.project')}")
+  options.add('--region=asia-northeast1')
+  options.add('--runner=DataflowRunner')
+
+  if (findProperty('serviceAccount')) {
+    options.add("--serviceAccount=${findProperty('serviceAccount')}")
+  }
+  if (findProperty('numWorkers')) {
+    options.add("--numWorkers=${findProperty('numWorkers')}")
+  }
+  if (findProperty('maxNumWorkers')) {
+    options.add("--maxNumWorkers=${findProperty('maxNumWorkers')}")
+  }
+  if (findProperty('workerMachineType')) {
+    options.add("--workerMachineType=${findProperty('workerMachineType')}")
+  }
+  if (findProperty('update') == "true") {
+    options.add("--update")
+  }
+
+  logger.info("options: ${options}")
+  args(options)
+}
